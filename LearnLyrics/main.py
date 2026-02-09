@@ -30,7 +30,6 @@ Initial prompt:
 I am helping children learn lyrics to church songs. I want to generate 1920x1080 images that contain the lyrics. The lyrics themselves are stored in the input subfolder as text documents. 
 Read in the all the files. Some of the songs have multiple verses. I want an image for each verse. If no verses are present then one image is fine. The verses are marked in the text files as 1., 2. etc for each verse. 
 I want you to generate multiple image versions of each song. Do not ever remove common english stop words (the, a, or, it, he, she, etc - use a library for those) but I want an image with 0% of the non-stop words replaced with periods (matching the string length of the removed word), 25% of the non-stop words replaced, 50%, 75% all the way to 100%. 
-
 """
 import os
 import re
@@ -161,15 +160,41 @@ def check_image_fill(output_path, verse_text):
         print(f"PASS: Image {output_path} fills >{WIDTH_FILL_THRESHOLD*100}% width")
         return True
 
-def get_max_font_size(draw, text_lines, font_path, max_width):
-    """Find the maximum font size that fits all text lines within max_width."""
+def check_bottom_overflow(output_path, verse_text):
+    """Unit test: Check if blue text overflows into the bottom 5% of the image."""
+    img = Image.open(output_path)
+    width, height = img.size
+    bottom_start = int(height * 0.95)  # Bottom 5% starts at 95% height
+    
+    # Scan pixels in the bottom 5%
+    for y in range(bottom_start, height):
+        for x in range(width):
+            r, g, b = img.getpixel((x, y))
+            if (r, g, b) == (0, 0, 255):  # Blue text
+                print(f"FAIL: Image {output_path} has blue text in bottom 5% (overflow at y={y})")
+                return False
+    
+    print(f"PASS: Image {output_path} has no blue text in bottom 5%")
+    return True
+
+def get_max_font_size(draw, text_lines, font_path, max_width, max_height, extra_space):
+    """Find the maximum font size that fits all text lines within max_width and max_height."""
     for size in range(200, 10, -1):
         try:
             font = ImageFont.truetype(font_path, size)
         except:
             font = ImageFont.load_default()
         max_line_width = max(draw.textbbox((0, 0), line, font=font)[2] for line in text_lines)
-        if max_line_width <= max_width:
+        if max_line_width > max_width:
+            continue
+        # Calculate total height
+        total_height = 0
+        for line in text_lines:
+            bbox = draw.textbbox((0, 0), line, font=font)
+            line_height = bbox[3] - bbox[1]
+            total_height += line_height
+        total_height += (len(text_lines) - 1) * extra_space
+        if total_height <= max_height:
             return size
     return 10  # Minimum fallback
 
@@ -182,7 +207,10 @@ def generate_image(song_title, verse_text, percentage, output_path, has_multiple
     
     # Determine max font size for lyrics based on actual text
     text_lines = verse_text.split('\n')
-    lyrics_font_size = get_max_font_size(draw, text_lines, fonts['regular'], IMAGE_WIDTH - 100)  # Leave some margin
+    extra_space = 30  # Additional vertical space between lines
+    max_bottom = int(IMAGE_HEIGHT * 0.94)  # Leave buffer to avoid bottom 5%
+    available_height = max_bottom - 250  # From y=250 to max_bottom
+    lyrics_font_size = get_max_font_size(draw, text_lines, fonts['regular'], IMAGE_WIDTH - 100, available_height, extra_space)
     title_font_size = TITLE_FONT_SIZE
     
     # Fonts
@@ -221,7 +249,6 @@ def generate_image(song_title, verse_text, percentage, output_path, has_multiple
     
     # Lyrics
     y = 250
-    extra_space = 30  # Additional vertical space between lines
     for line in verse_text.split('\n'):
         draw.text((50, y), line, fill=(0, 0, 255), font=lyrics_font)
         bbox = draw.textbbox((0, 0), line, font=lyrics_font)
@@ -230,8 +257,9 @@ def generate_image(song_title, verse_text, percentage, output_path, has_multiple
     
     img.save(output_path)
     
-    # Unit test
+    # Unit tests
     check_image_fill(output_path, verse_text)
+    check_bottom_overflow(output_path, verse_text)
 
 def main():
     input_dir = 'input'

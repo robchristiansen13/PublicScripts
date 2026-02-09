@@ -77,6 +77,7 @@ To bring his children home to him
 
 - Images are generated for each verse and each percentage level (25%, 50%, 75%, 100%).
 - Each song gets its own subfolder in `output/`.
+- Periods in the lyrics are replaced with slashes '/'
 - Blanks are represented by spaced dots (e.g., `...` for a 3-letter word).
 
 ## Example
@@ -85,13 +86,11 @@ Input file: `I Will Follow God's Plan (164).txt`
 ```
 1. I will follow God's plan for me
 Holding to his loving hand
-I will work and I will pray
-I will listen and obey
+...
 
 2. He has a work for me to do
 To bring his children home to him
-I will help and I will serve
-With all my heart I will be there
+...
 ```
 
 Output: Multiple images like:
